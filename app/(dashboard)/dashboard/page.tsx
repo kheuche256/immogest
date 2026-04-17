@@ -1,259 +1,278 @@
-import { createClient } from '@/lib/supabase/server'
-import { redirect } from 'next/navigation'
-import { format } from 'date-fns'
-import { fr } from 'date-fns/locale'
-import StatsCards from '@/components/dashboard/StatsCards'
-import RevenueChart from '@/components/dashboard/RevenueChart'
-import RecentPayments from '@/components/dashboard/RecentPayments'
-import AlertsList from '@/components/dashboard/AlertsList'
-import TopProperties from '@/components/dashboard/TopProperties'
-import QuickActions from '@/components/dashboard/QuickActions'
-import OnboardingBanner from '@/components/dashboard/OnboardingBanner'
-import { Alerte } from '@/types'
+'use client'
 
-// ─── Types locaux ─────────────────────────────────────────────────────────────
+import { useProfile } from '@/hooks/useProfile'
+import { useBiens } from '@/hooks/useBiens'
+import { useLocataires } from '@/hooks/useLocataires'
+import { usePaiements } from '@/hooks/usePaiements'
+import { useAlertes } from '@/hooks/useAlertes'
+import {
+  Building2,
+  Users,
+  Wallet,
+  AlertTriangle,
+  Home,
+  Calendar,
+} from 'lucide-react'
+import Link from 'next/link'
 
-interface DashboardStats {
-  totalBiens: number
-  biensLoues: number
-  locatairesActifs: number
-  totalLocataires: number
-  revenusMois: number
-  revenusMoisPrec: number
-  paiementsRetard: number
-  montantImpaye: number
-}
+export default function DashboardPage() {
+  const { profile } = useProfile()
+  const { biens, stats: bienStats } = useBiens()
+  const { locataires, stats: locataireStats } = useLocataires()
+  const { paiements, stats: paiementStats } = usePaiements()
+  const { alertes, stats: alerteStats } = useAlertes()
 
-interface MonthData {
-  mois: string
-  attendu: number
-  encaisse: number
-}
+  const prenom = profile?.nom?.split(' ')[0] || 'Utilisateur'
 
-interface RecentPayment {
-  id: string
-  locataire_nom: string
-  locataire_prenom: string
-  bien_nom: string
-  montant: number
-  statut: 'paye' | 'en_attente' | 'en_retard' | 'partiel'
-  date: string
-}
+  // ── Stats depuis les hooks ─────────────────────────────────────────────────
+  const totalBiens      = bienStats.total
+  const biensLoues      = bienStats.loues
+  const tauxOccupation  = bienStats.taux_occupation
+  const locatairesActifs = locataireStats?.actifs || 0
+  const paiementsRetard  = paiementStats?.retards || 0
+  const montantRetards   = paiementStats?.montantRetards || 0
+  const alertesNonLues   = alerteStats?.nonLues || 0
 
-interface TopPropertyItem {
-  id: string
-  nom: string
-  type: string
-  quartier?: string
-  ville: string
-  locataires_total: number
-  locataires_actifs: number
-  revenus_mensuels: number
-}
+  // Revenus du mois en cours
+  const moisActuel   = new Date().toISOString().slice(0, 7)
+  const paiementsMois = paiements?.filter((p) => p.mois === moisActuel) || []
+  const revenusMois   = paiementsMois
+    .filter((p) => p.statut === 'payé')
+    .reduce((sum, p) => sum + p.montant, 0)
 
-// ─── Fetch depuis Supabase ─────────────────────────────────────────────────────
-
-async function getDashboardData(userId: string) {
-  const supabase = await createClient()
-
-  const now = new Date()
-  const currentMonth = format(now, 'yyyy-MM')
-  const prevMonthDate = new Date(now.getFullYear(), now.getMonth() - 1, 1)
-  const prevMonth = format(prevMonthDate, 'yyyy-MM')
-
-  const [
-    { data: biens },
-    { data: locataires },
-    { data: paiementsMois },
-    { data: paiementsPrec },
-    { data: paiementsRetard },
-    { data: alertes },
-    { data: paiementsRecents },
-  ] = await Promise.all([
-    supabase.from('biens').select('*').eq('user_id', userId),
-    supabase.from('locataires').select('*').eq('user_id', userId),
-    supabase.from('paiements').select('*').eq('user_id', userId).eq('mois', currentMonth),
-    supabase.from('paiements').select('*').eq('user_id', userId).eq('mois', prevMonth),
-    supabase
-      .from('paiements')
-      .select('*, locataires(nom,prenom), biens(nom)')
-      .eq('user_id', userId)
-      .eq('statut', 'en_retard'),
-    supabase
-      .from('alertes')
-      .select('*, biens(nom), locataires(nom,prenom)')
-      .eq('user_id', userId)
-      .eq('lue', false)
-      .order('created_at', { ascending: false })
-      .limit(4),
-    supabase
-      .from('paiements')
-      .select('*, locataires(nom,prenom), biens(nom)')
-      .eq('user_id', userId)
-      .order('created_at', { ascending: false })
-      .limit(5),
-  ])
-
-  const stats: DashboardStats = {
-    totalBiens: biens?.length ?? 0,
-    biensLoues: biens?.filter((b) => b.statut === 'loue').length ?? 0,
-    locatairesActifs: locataires?.filter((l) => l.statut === 'actif').length ?? 0,
-    totalLocataires: locataires?.length ?? 0,
-    revenusMois:
-      paiementsMois
-        ?.filter((p) => p.statut === 'paye')
-        .reduce((sum, p) => sum + (p.montant_paye ?? p.montant), 0) ?? 0,
-    revenusMoisPrec:
-      paiementsPrec
-        ?.filter((p) => p.statut === 'paye')
-        .reduce((sum, p) => sum + (p.montant_paye ?? p.montant), 0) ?? 0,
-    paiementsRetard: paiementsRetard?.length ?? 0,
-    montantImpaye:
-      paiementsRetard?.reduce(
-        (sum, p) => sum + (p.montant - (p.montant_paye ?? 0)),
-        0
-      ) ?? 0,
-  }
-
-  const recentPayments: RecentPayment[] = (paiementsRecents ?? []).map((p: any) => ({
-    id: p.id,
-    locataire_nom: p.locataires?.nom ?? '',
-    locataire_prenom: p.locataires?.prenom ?? '',
-    bien_nom: p.biens?.nom ?? '',
-    montant: p.montant,
-    statut: p.statut,
-    date: p.date_paiement ?? p.date_echeance,
-  }))
-
-  const topBiens: TopPropertyItem[] = (biens ?? [])
-    .map((b: any) => {
-      const biensLocataires = locataires?.filter((l) => l.bien_id === b.id) ?? []
-      return {
-        id: b.id,
-        nom: b.nom,
-        type: b.type,
-        quartier: b.quartier,
-        ville: b.ville,
-        locataires_total: biensLocataires.length,
-        locataires_actifs: biensLocataires.filter((l) => l.statut === 'actif').length,
-        revenus_mensuels: b.loyer_mensuel,
-      }
-    })
-    .sort(
-      (a: TopPropertyItem, b: TopPropertyItem) => b.revenus_mensuels - a.revenus_mensuels
-    )
-
-  return {
-    stats,
-    recentPayments,
-    alertes: (alertes ?? []) as Alerte[],
-    topBiens,
-    chartData: [] as MonthData[],
-  }
-}
-
-// ─── Page ──────────────────────────────────────────────────────────────────────
-
-export default async function DashboardPage() {
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-
-  if (!user) redirect('/login')
-
-  const displayName =
-    user.user_metadata?.nom || user.email?.split('@')[0] || 'Utilisateur'
-
-  const moisAnnee = format(new Date(), 'MMMM yyyy', { locale: fr })
-  const moisAnneeCapitalized = moisAnnee.charAt(0).toUpperCase() + moisAnnee.slice(1)
-
-  const { stats, recentPayments, alertes, topBiens, chartData } =
-    await getDashboardData(user.id)
+  const statsCards = [
+    {
+      title:    'Total Biens',
+      value:    totalBiens,
+      subtitle: `${tauxOccupation}% occupés`,
+      detail:   biensLoues > 0 ? `${biensLoues} loué${biensLoues > 1 ? 's' : ''}` : null,
+      icon:     Building2,
+      color:    '#8B4513',
+      bg:       '#FFF5EB',
+      href:     '/biens',
+    },
+    {
+      title:    'Locataires',
+      value:    locatairesActifs,
+      subtitle: 'actifs',
+      detail:   `sur ${locataires?.length || 0} au total`,
+      icon:     Users,
+      color:    '#556B2F',
+      bg:       '#F0F5E8',
+      href:     '/locataires',
+    },
+    {
+      title:    'Revenus du mois',
+      value:    revenusMois > 0 ? `${(revenusMois / 1000).toFixed(0)}K` : '0',
+      subtitle: 'FCFA encaissés',
+      detail:   null,
+      icon:     Wallet,
+      color:    '#DAA520',
+      bg:       '#FDF8E8',
+      href:     '/paiements',
+    },
+    {
+      title:    'Impayés',
+      value:    paiementsRetard,
+      subtitle: 'en retard',
+      detail:   montantRetards > 0 ? `${(montantRetards / 1000).toFixed(0)}K FCFA` : null,
+      icon:     AlertTriangle,
+      color:    '#DC2626',
+      bg:       '#FEF2F2',
+      href:     '/alertes',
+    },
+  ]
 
   return (
-    <div className="space-y-6 pb-8">
+    <div className="space-y-6">
 
-      {/* ── Bannière onboarding (disparaît si entreprise déjà configurée) ── */}
-      <OnboardingBanner />
+      {/* ── Bienvenue ── */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h2 className="text-2xl font-bold" style={{ color: '#5D3A1A' }}>
+            Bonjour, {prenom} 👋
+          </h2>
+          <p style={{ color: '#8B7355' }}>Bienvenue sur votre espace KeurGest</p>
+        </div>
 
-      {/* ── Bannière de bienvenue ────────────────────────────────────────── */}
-      <div
-        className="rounded-2xl p-6 relative overflow-hidden"
-        style={{
-          background:
-            'linear-gradient(135deg, rgba(0,102,255,0.12) 0%, rgba(0,212,170,0.06) 100%)',
-          border: '1px solid rgba(0,102,255,0.15)',
-          boxShadow: '0 4px 24px rgba(0,0,0,0.3)',
-        }}
-      >
-        {/* Orbes décoratifs */}
-        <div
-          className="absolute -top-10 -right-10 w-48 h-48 rounded-full opacity-10 pointer-events-none"
-          style={{ background: 'radial-gradient(circle, #0066FF, transparent)' }}
-        />
-        <div
-          className="absolute -bottom-8 right-32 w-32 h-32 rounded-full opacity-10 pointer-events-none"
-          style={{ background: 'radial-gradient(circle, #00D4AA, transparent)' }}
-        />
-        <div className="relative">
-          <div className="flex items-center gap-2 mb-1">
-            <span className="text-2xl">👋</span>
-            <h1 className="text-2xl font-bold text-white">
-              Bienvenue,{' '}
-              <span
-                className="bg-clip-text text-transparent"
-                style={{
-                  backgroundImage: 'linear-gradient(135deg, #0066FF, #00D4AA)',
-                }}
+        {alertesNonLues > 0 && (
+          <Link
+            href="/alertes"
+            className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium w-fit transition-all hover:opacity-90"
+            style={{ backgroundColor: '#FEF2F2', color: '#DC2626' }}
+          >
+            <AlertTriangle className="w-4 h-4" />
+            {alertesNonLues} alerte{alertesNonLues > 1 ? 's' : ''} en attente
+          </Link>
+        )}
+      </div>
+
+      {/* ── Stats Cards ── */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6">
+        {statsCards.map((stat, i) => (
+          <Link
+            key={i}
+            href={stat.href}
+            className="bg-white rounded-2xl p-4 lg:p-6 border transition-all hover:shadow-lg group"
+            style={{ borderColor: '#F0E6D8' }}
+          >
+            <div className="mb-3 lg:mb-4">
+              <div
+                className="w-10 h-10 lg:w-12 lg:h-12 rounded-xl flex items-center justify-center transition-transform group-hover:scale-110"
+                style={{ backgroundColor: stat.bg }}
               >
-                {displayName}
+                <stat.icon className="w-5 h-5 lg:w-6 lg:h-6" style={{ color: stat.color }} />
+              </div>
+            </div>
+            <h3 className="text-2xl lg:text-3xl font-bold mb-1" style={{ color: '#5D3A1A' }}>
+              {stat.value}
+            </h3>
+            <p className="text-sm font-medium" style={{ color: '#8B7355' }}>{stat.title}</p>
+            <p className="text-xs mt-1" style={{ color: '#A89580' }}>
+              {stat.subtitle}
+              {stat.detail && <span className="block">{stat.detail}</span>}
+            </p>
+          </Link>
+        ))}
+      </div>
+
+      {/* ── Actions rapides ── */}
+      <div className="bg-white rounded-2xl p-4 lg:p-6 border" style={{ borderColor: '#F0E6D8' }}>
+        <h3 className="text-lg font-bold mb-4" style={{ color: '#5D3A1A' }}>
+          Actions rapides
+        </h3>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          {[
+            { icon: Home,        label: 'Nouveau bien',          href: '/biens/nouveau',        color: '#8B4513', bg: '#FFF5EB' },
+            { icon: Users,       label: 'Nouveau locataire',     href: '/locataires/nouveau',   color: '#556B2F', bg: '#F0F5E8' },
+            { icon: Wallet,      label: 'Enregistrer paiement',  href: '/paiements/nouveau',    color: '#DAA520', bg: '#FDF8E8' },
+            { icon: Calendar,    label: 'Nouvelle réservation',  href: '/reservations/nouveau', color: '#8B4513', bg: '#FFF5EB' },
+          ].map((action, i) => (
+            <Link
+              key={i}
+              href={action.href}
+              className="flex flex-col items-center gap-2 p-4 rounded-xl transition-all hover:shadow-md text-center"
+              style={{ backgroundColor: action.bg }}
+            >
+              <action.icon className="w-6 h-6" style={{ color: action.color }} />
+              <span className="text-xs sm:text-sm font-medium" style={{ color: '#5D3A1A' }}>
+                {action.label}
               </span>
-            </h1>
-          </div>
-          <p className="text-gray-400 text-sm">
-            Vue d&apos;ensemble de votre portefeuille immobilier &bull;{' '}
-            {moisAnneeCapitalized}
-          </p>
+            </Link>
+          ))}
         </div>
       </div>
 
-      {/* ── Stats Cards ─────────────────────────────────────────────────── */}
-      <StatsCards
-        totalBiens={stats.totalBiens}
-        biensLoues={stats.biensLoues}
-        locatairesActifs={stats.locatairesActifs}
-        totalLocataires={stats.totalLocataires}
-        revenusMois={stats.revenusMois}
-        revenusMoisPrec={stats.revenusMoisPrec}
-        paiementsRetard={stats.paiementsRetard}
-        montantImpaye={stats.montantImpaye}
-      />
+      {/* ── Grille principale ── */}
+      <div className="grid lg:grid-cols-3 gap-6">
 
-      {/* ── Graphique Revenus ────────────────────────────────────────────── */}
-      <RevenueChart data={chartData} />
+        {/* Derniers paiements */}
+        <div className="lg:col-span-2 bg-white rounded-2xl p-4 lg:p-6 border" style={{ borderColor: '#F0E6D8' }}>
+          <div className="flex items-center justify-between mb-4 lg:mb-6">
+            <h3 className="text-lg font-bold" style={{ color: '#5D3A1A' }}>Derniers paiements</h3>
+            <Link href="/paiements" className="text-sm font-medium hover:underline" style={{ color: '#8B4513' }}>
+              Voir tout →
+            </Link>
+          </div>
 
-      {/* ── Grille inférieure ────────────────────────────────────────────── */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
+          <div className="space-y-3">
+            {paiements?.slice(0, 5).map((paiement, i) => (
+              <div
+                key={paiement.id || i}
+                className="flex items-center justify-between p-3 lg:p-4 rounded-xl"
+                style={{ backgroundColor: '#FAF5F0' }}
+              >
+                <div className="flex items-center gap-3 lg:gap-4 min-w-0">
+                  <div
+                    className="w-10 h-10 rounded-full flex items-center justify-center font-bold text-white text-sm flex-shrink-0"
+                    style={{ backgroundColor: '#CD853F' }}
+                  >
+                    {paiement.locataire?.nom?.charAt(0) || 'L'}
+                  </div>
+                  <div className="min-w-0">
+                    <p className="font-medium text-sm truncate" style={{ color: '#5D3A1A' }}>
+                      {paiement.locataire?.nom || 'Locataire'}
+                    </p>
+                    <p className="text-xs truncate" style={{ color: '#8B7355' }}>
+                      {paiement.bien?.nom || 'Bien'}
+                    </p>
+                  </div>
+                </div>
+                <div className="text-right flex-shrink-0 ml-3">
+                  <p className="font-bold text-sm" style={{ color: '#5D3A1A' }}>
+                    {paiement.montant?.toLocaleString()} F
+                  </p>
+                  <span
+                    className="text-xs px-2 py-0.5 rounded-full font-medium"
+                    style={{
+                      backgroundColor:
+                        paiement.statut === 'payé'   ? '#F0F5E8' :
+                        paiement.statut === 'retard' ? '#FEF2F2' : '#FDF8E8',
+                      color:
+                        paiement.statut === 'payé'   ? '#556B2F' :
+                        paiement.statut === 'retard' ? '#DC2626' : '#DAA520',
+                    }}
+                  >
+                    {paiement.statut === 'payé'   ? '✓ Payé' :
+                     paiement.statut === 'retard' ? 'Retard' : 'En attente'}
+                  </span>
+                </div>
+              </div>
+            ))}
 
-        {/* Derniers paiements — span 2 col sur xl */}
-        <div className="xl:col-span-2">
-          <RecentPayments payments={recentPayments} />
+            {(!paiements || paiements.length === 0) && (
+              <div className="text-center py-8">
+                <Wallet className="w-12 h-12 mx-auto mb-3 opacity-30" style={{ color: '#8B7355' }} />
+                <p style={{ color: '#8B7355' }}>Aucun paiement récent</p>
+                <Link href="/paiements/nouveau" className="inline-block mt-3 text-sm font-medium" style={{ color: '#8B4513' }}>
+                  + Enregistrer un paiement
+                </Link>
+              </div>
+            )}
+          </div>
         </div>
 
-        {/* Alertes */}
-        <div>
-          <AlertsList alertes={alertes} />
+        {/* Alertes récentes */}
+        <div className="bg-white rounded-2xl p-4 lg:p-6 border" style={{ borderColor: '#F0E6D8' }}>
+          <div className="flex items-center justify-between mb-4 lg:mb-6">
+            <h3 className="text-lg font-bold" style={{ color: '#5D3A1A' }}>Alertes</h3>
+            <Link href="/alertes" className="text-sm font-medium hover:underline" style={{ color: '#8B4513' }}>
+              Voir tout →
+            </Link>
+          </div>
+
+          <div className="space-y-3">
+            {alertes?.filter((a) => !a.lue).slice(0, 4).map((alerte, i) => (
+              <div
+                key={alerte.id || i}
+                className="p-3 lg:p-4 rounded-xl border-l-4"
+                style={{
+                  backgroundColor: '#FAF5F0',
+                  borderLeftColor:
+                    alerte.priorite === 'urgente' ? '#DC2626' :
+                    alerte.priorite === 'haute'   ? '#F59E0B' : '#8B4513',
+                }}
+              >
+                <p className="font-medium text-sm" style={{ color: '#5D3A1A' }}>
+                  {alerte.titre}
+                </p>
+                {alerte.message && (
+                  <p className="text-xs mt-1 line-clamp-2" style={{ color: '#8B7355' }}>
+                    {alerte.message}
+                  </p>
+                )}
+              </div>
+            ))}
+
+            {(!alertes || alertes.filter((a) => !a.lue).length === 0) && (
+              <div className="text-center py-8">
+                <div className="text-4xl mb-2">🎉</div>
+                <p className="font-medium" style={{ color: '#556B2F' }}>Tout est en ordre !</p>
+                <p className="text-sm" style={{ color: '#8B7355' }}>Aucune alerte en attente</p>
+              </div>
+            )}
+          </div>
         </div>
-
-        {/* Top Biens — span 2 col sur xl */}
-        <div className="xl:col-span-2">
-          <TopProperties biens={topBiens} />
-        </div>
-
-        {/* Actions Rapides */}
-        <QuickActions />
-
       </div>
     </div>
   )

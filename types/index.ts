@@ -45,6 +45,13 @@ export interface Bien {
   loyer_mensuel: number
   charges: number           // DEFAULT 0
   description?: string
+  // Location meublée (courte durée)
+  est_meuble?: boolean           // true = bien meublé
+  tarif_nuit?: number | null     // tarif par nuitée (FCFA)
+  tarif_semaine?: number | null  // tarif à la semaine (FCFA)
+  tarif_mois?: number | null     // tarif mensuel meublé (FCFA)
+  capacite_personnes?: number    // nombre max de personnes
+  equipements?: string[]         // ex: ['wifi','piscine','climatisation']
   created_at: string
   updated_at: string
   // Relations
@@ -62,6 +69,13 @@ export interface BienFormData {
   charges?: number
   description?: string
   statut?: StatutBien | string
+  // Location meublée
+  est_meuble?: boolean
+  tarif_nuit?: number | null
+  tarif_semaine?: number | null
+  tarif_mois?: number | null
+  capacite_personnes?: number
+  equipements?: string[]
 }
 
 // ─── Locataire ───────────────────────────────────────────────────────────────
@@ -186,6 +200,204 @@ export interface Quittance {
   paiement?: Paiement
   locataire?: Locataire
   bien?: Bien
+}
+
+// ─── Réservation ─────────────────────────────────────────────────────────────
+export type StatutReservation =
+  | 'en_attente'
+  | 'confirmee'
+  | 'en_cours'
+  | 'terminee'
+  | 'annulee'
+
+export interface Reservation {
+  id: string
+  user_id: string
+  bien_id: string
+  // Client (locataire existant ou nouveau)
+  locataire_id?: string | null
+  client_nom: string
+  client_telephone: string
+  client_email?: string
+  // Période
+  date_debut: string          // ISO date YYYY-MM-DD
+  date_fin: string            // ISO date YYYY-MM-DD
+  // Tarification
+  tarif_nuitee: number
+  nb_nuits: number
+  montant_total: number
+  acompte: number             // DEFAULT 0
+  montant_restant: number
+  // Statut & meta
+  statut: StatutReservation
+  notes?: string
+  created_at: string
+  updated_at: string
+  // Relations
+  bien?: Bien
+  locataire?: Locataire
+}
+
+export interface ReservationFormData {
+  bien_id: string
+  locataire_id?: string | null
+  client_nom: string
+  client_telephone: string
+  client_email?: string
+  date_debut: string
+  date_fin: string
+  tarif_nuitee: number
+  acompte?: number
+  notes?: string
+  statut?: StatutReservation
+}
+
+// ─── Charge ───────────────────────────────────────────────────────────────────
+export type TypeCharge =
+  | 'electricite'
+  | 'eau'
+  | 'wifi'
+  | 'menage'
+  | 'gardiennage'
+  | 'syndic'
+  | 'ordures'
+  | 'tv'
+  | 'entretien'
+  | 'internet'
+  | 'reparation'
+  | 'autre'
+
+export type PeriodiciteCharge = 'mensuel' | 'trimestriel' | 'annuel' | 'ponctuel'
+
+export interface Charge {
+  id: string
+  user_id: string
+  bien_id: string
+  // Champs principaux (table Supabase)
+  type: TypeCharge | string
+  nom: string
+  montant: number
+  periodicite: PeriodiciteCharge | string
+  inclus_loyer: boolean
+  notes?: string
+  // Champs optionnels (liens avec d'autres entités)
+  locataire_id?: string | null
+  reservation_id?: string | null
+  created_at: string
+  updated_at?: string
+  // Relations
+  bien?: Bien
+  locataire?: Locataire
+}
+
+export interface ChargeFormData {
+  bien_id: string
+  type: TypeCharge | string
+  nom: string
+  montant: number
+  periodicite: PeriodiciteCharge | string
+  inclus_loyer: boolean
+  notes?: string
+  locataire_id?: string | null
+  reservation_id?: string | null
+}
+
+// ─── Inventaire (table standalone — meubles & équipements) ───────────────────
+export type CategorieInventaire =
+  | 'mobilier'
+  | 'electromenager'
+  | 'literie'
+  | 'cuisine'
+  | 'decoration'
+  | 'equipement'
+  | 'autre'
+
+export type EtatInventaire = 'neuf' | 'bon' | 'use' | 'a_remplacer'
+
+export interface InventaireArticle {
+  id: string
+  user_id: string
+  bien_id: string
+  categorie: CategorieInventaire | string
+  nom: string
+  quantite: number
+  etat: EtatInventaire | string
+  valeur?: number | null        // valeur estimée en FCFA
+  date_achat?: string | null    // ISO date
+  photo_url?: string | null     // URL Supabase Storage
+  notes?: string
+  created_at: string
+  updated_at?: string
+  // Relation
+  bien?: Bien
+}
+
+export interface InventaireArticleFormData {
+  bien_id: string
+  categorie: CategorieInventaire | string
+  nom: string
+  quantite: number
+  etat: EtatInventaire | string
+  valeur?: number | null
+  date_achat?: string | null
+  photo_url?: string | null
+  notes?: string
+}
+
+// ─── État des lieux ───────────────────────────────────────────────────────────
+// InventaireItem — utilisé uniquement dans les anciens EtatLieux JSON (legacy)
+export interface InventaireItem {
+  id?: string
+  nom: string
+  quantite: number
+  etat: 'bon' | 'moyen' | 'mauvais'
+  notes?: string
+}
+
+export type EtatGeneral = 'excellent' | 'bon' | 'moyen' | 'mauvais'
+export type PropreteLieux = 'impeccable' | 'propre' | 'a_nettoyer' | 'sale'
+
+// Correspond à la table Supabase : etats_lieux
+export interface EtatLieux {
+  id: string
+  user_id: string
+  bien_id: string
+  locataire_id?: string | null
+  reservation_id?: string | null
+  type: 'entree' | 'sortie'
+  date_etat: string                       // date de l'état des lieux
+  releve_electricite?: number | null      // index compteur électricité
+  releve_eau?: number | null              // index compteur eau
+  etat_general?: EtatGeneral | null
+  proprete?: PropreteLieux | null
+  photos?: string[]                       // URLs Supabase Storage
+  observations?: string
+  anomalies?: string
+  signe_proprietaire: boolean
+  signe_locataire: boolean
+  date_signature?: string | null
+  created_at: string
+  updated_at?: string
+  // Relations
+  bien?: Bien
+  locataire?: Locataire
+  reservation?: { id: string; date_debut: string; date_fin: string }
+}
+
+export interface EtatLieuxFormData {
+  bien_id: string
+  locataire_id?: string | null
+  reservation_id?: string | null
+  type: 'entree' | 'sortie'
+  date_etat: string
+  releve_electricite?: number | null
+  releve_eau?: number | null
+  etat_general?: EtatGeneral | null
+  proprete?: PropreteLieux | null
+  observations?: string
+  anomalies?: string
+  signe_proprietaire?: boolean
+  signe_locataire?: boolean
 }
 
 // ─── Helpers types ────────────────────────────────────────────────────────────

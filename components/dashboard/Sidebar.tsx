@@ -1,11 +1,12 @@
 'use client'
 
+import { useState } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { usePathname, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import { useAlertes } from '@/hooks/useAlertes'
 import { useProfile } from '@/hooks/useProfile'
+import { useAlertes } from '@/hooks/useAlertes'
 import {
   LayoutDashboard,
   Building2,
@@ -16,252 +17,255 @@ import {
   BarChart3,
   Settings,
   LogOut,
+  ChevronRight,
+  Menu,
   X,
+  Calendar,
+  Receipt,
+  Package,
+  ClipboardList,
 } from 'lucide-react'
 
-interface NavItem {
-  label: string
-  href: string
-  icon: React.ElementType
-  badge?: number
-}
-
-const BASE_NAV_ITEMS: NavItem[] = [
-  { label: 'Dashboard',  href: '/dashboard',  icon: LayoutDashboard },
-  { label: 'Biens',      href: '/biens',       icon: Building2 },
-  { label: 'Locataires', href: '/locataires',  icon: Users },
-  { label: 'Paiements',  href: '/paiements',   icon: Wallet },
-  { label: 'Alertes',    href: '/alertes',     icon: Bell },
-  { label: 'Quittances', href: '/quittances',  icon: FileText },
-  { label: 'Rapports',   href: '/rapports',    icon: BarChart3 },
-  { label: 'Paramètres', href: '/parametres',  icon: Settings },
+const menuItems = [
+  { href: '/dashboard',    icon: LayoutDashboard, label: 'Tableau de bord' },
+  { href: '/biens',        icon: Building2,        label: 'Biens' },
+  { href: '/locataires',   icon: Users,            label: 'Locataires' },
+  { href: '/paiements',    icon: Wallet,           label: 'Paiements' },
+  { href: '/reservations', icon: Calendar,         label: 'Réservations', isNew: true },
+  { href: '/charges',      icon: Receipt,          label: 'Charges' },
+  { href: '/inventaire',   icon: Package,          label: 'Inventaire' },
+  { href: '/etats-lieux',  icon: ClipboardList,    label: 'États des lieux' },
+  { href: '/alertes',      icon: Bell,             label: 'Alertes', badge: true },
+  { href: '/quittances',   icon: FileText,         label: 'Quittances' },
+  { href: '/rapports',     icon: BarChart3,        label: 'Rapports' },
 ]
 
-interface SidebarProps {
-  displayName: string
-  email: string
-  isOpen: boolean
-  onClose: () => void
-}
-
-export default function Sidebar({ displayName, email, isOpen, onClose }: SidebarProps) {
+export function Sidebar() {
   const pathname = usePathname()
   const router = useRouter()
-  const { stats: alerteStats } = useAlertes()
   const { profile } = useProfile()
+  const { stats } = useAlertes()
+  const [loggingOut, setLoggingOut] = useState(false)
+  const [mobileOpen, setMobileOpen] = useState(false)
 
-  // Badge dynamique : alertes non lues sur l'item "Alertes"
-  const navItems: NavItem[] = BASE_NAV_ITEMS.map((item) =>
-    item.href === '/alertes' && alerteStats.nonLues > 0
-      ? { ...item, badge: alerteStats.nonLues }
-      : item
-  )
-
-  const initials = displayName
-    .split(' ')
-    .map((n) => n[0])
-    .join('')
-    .toUpperCase()
-    .slice(0, 2)
-
-  async function handleLogout() {
+  const handleLogout = async () => {
+    setLoggingOut(true)
     const supabase = createClient()
     await supabase.auth.signOut()
     router.push('/login')
-    router.refresh()
   }
 
-  const isActive = (href: string) => {
-    if (href === '/dashboard') return pathname === '/dashboard'
-    return pathname.startsWith(href)
-  }
+  const nomEntreprise = profile?.entreprise || 'KeurGest'
+  const alertesNonLues = stats?.nonLues || 0
 
-  return (
-    <aside
-      className={`
-        fixed top-0 left-0 h-full z-40 flex flex-col
-        transition-transform duration-300 ease-in-out
-        lg:translate-x-0
-        ${isOpen ? 'translate-x-0' : '-translate-x-full'}
-      `}
-      style={{
-        width: '280px',
-        background: 'rgba(17, 24, 39, 0.95)',
-        backdropFilter: 'blur(20px)',
-        WebkitBackdropFilter: 'blur(20px)',
-        borderRight: '1px solid rgba(255, 255, 255, 0.06)',
-        boxShadow: '4px 0 24px rgba(0, 0, 0, 0.4)',
-      }}
-    >
+  const isActive = (href: string) =>
+    href === '/dashboard'
+      ? pathname === href
+      : pathname.startsWith(href)
+
+  const SidebarContent = () => (
+    <>
       {/* ── Logo ── */}
-      <div className="flex items-center justify-between px-6 py-5"
-        style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-        <div className="flex items-center gap-3 min-w-0">
-          {/* Logo entreprise ou icône par défaut */}
+      <div className="p-5 border-b" style={{ borderColor: '#F0E6D8' }}>
+        <Link href="/dashboard" className="flex items-center gap-3">
           {profile?.logo_url ? (
-            <div className="w-10 h-10 rounded-xl overflow-hidden flex-shrink-0 flex items-center justify-center"
-              style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)' }}>
-              <Image
+            <>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
                 src={profile.logo_url}
-                alt="Logo entreprise"
-                width={40}
-                height={40}
-                className="object-contain w-full h-full"
+                alt={nomEntreprise}
+                className="w-10 h-10 rounded-xl object-cover flex-shrink-0"
               />
-            </div>
+              <div className="min-w-0">
+                <span className="font-bold block truncate" style={{ color: '#5D3A1A' }}>
+                  {nomEntreprise}
+                </span>
+                <span className="text-xs" style={{ color: '#8B7355' }}>
+                  Powered by KeurGest
+                </span>
+              </div>
+            </>
           ) : (
-            <div
-              className="flex items-center justify-center w-10 h-10 rounded-xl text-xl flex-shrink-0"
-              style={{
-                background: `linear-gradient(135deg, ${profile?.couleur_principale ?? '#0066FF'} 0%, #00D4AA 100%)`,
-                boxShadow: `0 4px 12px ${profile?.couleur_principale ?? '#0066FF'}55`,
-              }}
-            >
-              🏠
-            </div>
+            <Image
+              src="/logo.png"
+              alt="KeurGest"
+              width={140}
+              height={40}
+              className="h-10 w-auto"
+            />
           )}
-          {/* Brand text */}
-          <div className="min-w-0">
-            <div
-              className="text-lg font-bold leading-tight truncate"
-              style={{
-                backgroundImage: `linear-gradient(135deg, ${profile?.couleur_principale ?? '#0066FF'}, #00D4AA)`,
-                WebkitBackgroundClip: 'text',
-                WebkitTextFillColor: 'transparent',
-                backgroundClip: 'text',
-              }}
-            >
-              {profile?.entreprise || 'ImmoGest'}
-            </div>
-            <div className="text-[10px] font-medium tracking-widest uppercase"
-              style={{ color: 'rgba(156,163,175,0.7)' }}>
-              Gestion Immobilière
-            </div>
-          </div>
-        </div>
-        {/* Mobile close button */}
-        <button
-          onClick={onClose}
-          className="lg:hidden p-1.5 rounded-lg transition-colors hover:bg-white/10 text-gray-400 flex-shrink-0"
-        >
-          <X size={18} />
-        </button>
+        </Link>
       </div>
 
       {/* ── Navigation ── */}
-      <nav className="flex-1 px-3 py-4 overflow-y-auto space-y-0.5 scrollbar-hide">
-        {/* Section label */}
-        <p className="px-3 mb-2 text-[10px] font-semibold uppercase tracking-widest"
-          style={{ color: 'rgba(107,114,128,0.8)' }}>
-          Navigation
-        </p>
-
-        {navItems.map((item) => {
+      <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
+        {menuItems.map((item) => {
           const active = isActive(item.href)
-          const Icon = item.icon
-
           return (
             <Link
               key={item.href}
               href={item.href}
-              onClick={onClose}
-              className="flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-150 group relative"
+              onClick={() => setMobileOpen(false)}
+              className="flex items-center gap-3 px-4 py-3 rounded-xl transition-all relative group"
               style={{
-                background: active
-                  ? 'linear-gradient(135deg, rgba(0,102,255,0.15) 0%, rgba(0,212,170,0.08) 100%)'
-                  : 'transparent',
-                color: active ? '#ffffff' : 'rgba(156,163,175,1)',
-                borderLeft: active ? '3px solid #00D4AA' : '3px solid transparent',
+                backgroundColor: active ? '#FFF5EB' : 'transparent',
+                color: active ? '#8B4513' : '#6B5B4F',
               }}
               onMouseEnter={(e) => {
-                if (!active) {
-                  e.currentTarget.style.background = 'rgba(255,255,255,0.05)'
-                  e.currentTarget.style.color = '#ffffff'
-                }
+                if (!active) e.currentTarget.style.backgroundColor = '#FAF5F0'
               }}
               onMouseLeave={(e) => {
-                if (!active) {
-                  e.currentTarget.style.background = 'transparent'
-                  e.currentTarget.style.color = 'rgba(156,163,175,1)'
-                }
+                if (!active) e.currentTarget.style.backgroundColor = 'transparent'
               }}
             >
-              <Icon
-                size={18}
-                className="flex-shrink-0 transition-colors"
-                style={{ color: active ? '#00D4AA' : 'inherit' }}
-              />
-              <span className="flex-1 text-sm font-medium">{item.label}</span>
-              {item.badge !== undefined && (
+              {/* Barre active */}
+              {active && (
+                <div
+                  className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-8 rounded-r-full"
+                  style={{ backgroundColor: '#8B4513' }}
+                />
+              )}
+
+              <item.icon className="w-5 h-5 flex-shrink-0" />
+              <span className="font-medium flex-1 text-sm">{item.label}</span>
+
+              {/* Badge NEW */}
+              {item.isNew && (
                 <span
-                  className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full leading-none${alerteStats.urgentes > 0 ? ' animate-pulse' : ''}`}
-                  style={{
-                    background: alerteStats.urgentes > 0
-                      ? 'linear-gradient(135deg, #FF0000, #CC0000)'
-                      : 'linear-gradient(135deg, #EF4444, #DC2626)',
-                    color: '#fff',
-                    boxShadow: alerteStats.urgentes > 0
-                      ? '0 2px 10px rgba(255,0,0,0.6)'
-                      : '0 2px 6px rgba(239,68,68,0.4)',
-                    minWidth: '18px',
-                    textAlign: 'center',
-                  }}
+                  className="text-[10px] font-bold text-white px-1.5 py-0.5 rounded-full"
+                  style={{ backgroundColor: '#DAA520' }}
                 >
-                  {item.badge}
+                  NEW
                 </span>
+              )}
+
+              {/* Badge alertes */}
+              {item.badge && alertesNonLues > 0 && (
+                <span
+                  className="text-[10px] font-bold text-white px-1.5 py-0.5 rounded-full"
+                  style={{ backgroundColor: '#DC2626' }}
+                >
+                  {alertesNonLues}
+                </span>
+              )}
+
+              {/* Hover arrow */}
+              {!active && !item.badge && !item.isNew && (
+                <ChevronRight
+                  className="w-4 h-4 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0"
+                  style={{ color: '#8B7355' }}
+                />
               )}
             </Link>
           )
         })}
       </nav>
 
-      {/* ── User footer ── */}
-      <div
-        className="px-3 py-4"
-        style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}
-      >
-        <div
-          className="flex items-center gap-3 px-3 py-3 rounded-xl"
-          style={{ background: 'rgba(255,255,255,0.03)' }}
+      {/* ── Footer ── */}
+      <div className="p-4 border-t" style={{ borderColor: '#F0E6D8' }}>
+        {/* Paramètres */}
+        <Link
+          href="/parametres"
+          onClick={() => setMobileOpen(false)}
+          className="flex items-center gap-3 px-4 py-3 rounded-xl transition-all mb-2"
+          style={{
+            backgroundColor: isActive('/parametres') ? '#FFF5EB' : 'transparent',
+            color: isActive('/parametres') ? '#8B4513' : '#6B5B4F',
+          }}
+          onMouseEnter={(e) => {
+            if (!isActive('/parametres')) e.currentTarget.style.backgroundColor = '#FAF5F0'
+          }}
+          onMouseLeave={(e) => {
+            if (!isActive('/parametres')) e.currentTarget.style.backgroundColor = 'transparent'
+          }}
         >
-          {/* Avatar */}
+          <Settings className="w-5 h-5" />
+          <span className="font-medium text-sm">Paramètres</span>
+        </Link>
+
+        {/* Profil */}
+        <div
+          className="flex items-center gap-3 px-4 py-3 rounded-xl mb-2"
+          style={{ backgroundColor: '#FAF5F0' }}
+        >
           <div
-            className="flex items-center justify-center w-9 h-9 rounded-xl text-sm font-bold text-white flex-shrink-0"
-            style={{
-              background: 'linear-gradient(135deg, #0066FF 0%, #00D4AA 100%)',
-              boxShadow: '0 2px 8px rgba(0,102,255,0.3)',
-            }}
+            className="w-9 h-9 rounded-full flex items-center justify-center font-bold text-white text-sm flex-shrink-0"
+            style={{ backgroundColor: '#8B4513' }}
           >
-            {initials}
+            {profile?.nom?.charAt(0).toUpperCase() || 'U'}
           </div>
-          {/* Name & email */}
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-semibold text-white truncate leading-tight">
-              {displayName}
+            <p className="font-medium text-sm truncate" style={{ color: '#5D3A1A' }}>
+              {profile?.nom || 'Utilisateur'}
             </p>
-            <p className="text-[11px] truncate" style={{ color: 'rgba(107,114,128,1)' }}>
-              {email}
+            <p className="text-xs truncate" style={{ color: '#8B7355' }}>
+              {profile?.email}
             </p>
           </div>
-          {/* Logout */}
-          <button
-            onClick={handleLogout}
-            title="Se déconnecter"
-            className="p-1.5 rounded-lg transition-all flex-shrink-0"
-            style={{ color: 'rgba(107,114,128,1)' }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.background = 'rgba(239,68,68,0.15)'
-              e.currentTarget.style.color = '#F87171'
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.background = 'transparent'
-              e.currentTarget.style.color = 'rgba(107,114,128,1)'
-            }}
-          >
-            <LogOut size={16} />
-          </button>
         </div>
+
+        {/* Déconnexion */}
+        <button
+          onClick={handleLogout}
+          disabled={loggingOut}
+          className="w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all hover:bg-red-50 disabled:opacity-50"
+          style={{ color: '#DC2626' }}
+        >
+          {loggingOut ? (
+            <div className="w-5 h-5 border-2 border-red-500 border-t-transparent rounded-full animate-spin" />
+          ) : (
+            <LogOut className="w-5 h-5" />
+          )}
+          <span className="font-medium text-sm">Déconnexion</span>
+        </button>
       </div>
-    </aside>
+    </>
+  )
+
+  return (
+    <>
+      {/* Bouton hamburger mobile */}
+      <button
+        onClick={() => setMobileOpen(true)}
+        className="lg:hidden fixed top-4 left-4 z-50 p-2.5 rounded-xl bg-white shadow-lg border"
+        style={{ borderColor: '#F0E6D8' }}
+      >
+        <Menu className="w-5 h-5" style={{ color: '#5D3A1A' }} />
+      </button>
+
+      {/* Overlay mobile */}
+      {mobileOpen && (
+        <div
+          className="lg:hidden fixed inset-0 bg-black/40 z-40 backdrop-blur-sm"
+          onClick={() => setMobileOpen(false)}
+        />
+      )}
+
+      {/* Sidebar mobile */}
+      <aside
+        className={`lg:hidden fixed left-0 top-0 bottom-0 w-72 flex flex-col border-r z-50 transform transition-transform duration-300 ${
+          mobileOpen ? 'translate-x-0' : '-translate-x-full'
+        }`}
+        style={{ backgroundColor: '#FFFFFF', borderColor: '#F0E6D8' }}
+      >
+        <button
+          onClick={() => setMobileOpen(false)}
+          className="absolute top-4 right-4 p-2 rounded-lg transition-colors hover:bg-gray-100"
+        >
+          <X className="w-5 h-5" style={{ color: '#5D3A1A' }} />
+        </button>
+        <SidebarContent />
+      </aside>
+
+      {/* Sidebar desktop */}
+      <aside
+        className="hidden lg:flex fixed left-0 top-0 bottom-0 w-64 flex-col border-r"
+        style={{ backgroundColor: '#FFFFFF', borderColor: '#F0E6D8' }}
+      >
+        <SidebarContent />
+      </aside>
+    </>
   )
 }
+
+export default Sidebar

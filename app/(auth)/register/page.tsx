@@ -1,376 +1,318 @@
 'use client'
 
 import { useState } from 'react'
-import Link from 'next/link'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
+import Image from 'next/image'
 import { createClient } from '@/lib/supabase/client'
-import { Eye, EyeOff, UserPlus, Loader2, CheckCircle } from 'lucide-react'
+import { Mail, Lock, User, Phone, ArrowRight, Eye, EyeOff, Building2 } from 'lucide-react'
 
 export default function RegisterPage() {
-  const router = useRouter()
-  const [form, setForm] = useState({
+  const [formData, setFormData] = useState({
     nom: '',
     email: '',
     telephone: '',
+    entreprise: '',
     password: '',
     confirmPassword: '',
   })
   const [showPassword, setShowPassword] = useState(false)
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false)
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState('')
-  const [success, setSuccess] = useState(false)
+  const [acceptTerms, setAcceptTerms]   = useState(false)
+  const [error, setError]               = useState('')
+  const [loading, setLoading]           = useState(false)
+  const router   = useRouter()
+  const supabase = createClient()
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }))
-  }
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) =>
+    setFormData({ ...formData, [e.target.name]: e.target.value })
 
-  async function handleRegister(e: React.FormEvent) {
+  const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
 
-    if (form.password !== form.confirmPassword) {
-      setError('Les mots de passe ne correspondent pas.')
+    if (!acceptTerms) {
+      setError("Veuillez accepter les conditions d'utilisation")
       return
     }
-    if (form.password.length < 6) {
-      setError('Le mot de passe doit contenir au moins 6 caractères.')
+    if (formData.password !== formData.confirmPassword) {
+      setError('Les mots de passe ne correspondent pas')
+      return
+    }
+    if (formData.password.length < 6) {
+      setError('Le mot de passe doit contenir au moins 6 caractères')
       return
     }
 
     setLoading(true)
-
-    const supabase = createClient()
-    const { error: authError } = await supabase.auth.signUp({
-      email: form.email,
-      password: form.password,
-      options: {
-        data: {
-          nom: form.nom,
-          telephone: form.telephone,
+    try {
+      const { error } = await supabase.auth.signUp({
+        email:    formData.email,
+        password: formData.password,
+        options:  {
+          data: {
+            nom:        formData.nom,
+            telephone:  formData.telephone,
+            entreprise: formData.entreprise,
+          },
         },
-      },
-    })
-
-    if (authError) {
-      setError(
-        authError.message.includes('already registered')
-          ? 'Cet email est déjà utilisé. Essayez de vous connecter.'
-          : authError.message
-      )
-      setLoading(false)
-      return
-    }
-
-    setSuccess(true)
-    setLoading(false)
-    setTimeout(() => {
+      })
+      if (error) throw error
       router.push('/dashboard')
-      router.refresh()
-    }, 2000)
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Erreur lors de l'inscription")
+    } finally {
+      setLoading(false)
+    }
   }
 
-  const inputBaseStyle: React.CSSProperties = {
-    background: 'rgba(255, 255, 255, 0.05)',
-    border: '1px solid rgba(255, 255, 255, 0.1)',
-  }
-
-  const inputFocusHandlers = {
-    onFocus: (e: React.FocusEvent<HTMLInputElement>) => {
-      e.currentTarget.style.border = '1px solid rgba(0, 102, 255, 0.6)'
-      e.currentTarget.style.background = 'rgba(0, 102, 255, 0.05)'
-      e.currentTarget.style.boxShadow = '0 0 0 3px rgba(0, 102, 255, 0.1)'
-    },
-    onBlur: (e: React.FocusEvent<HTMLInputElement>) => {
-      e.currentTarget.style.border = '1px solid rgba(255, 255, 255, 0.1)'
-      e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)'
-      e.currentTarget.style.boxShadow = 'none'
-    },
-  }
-
-  const passwordMatch =
-    form.confirmPassword.length > 0 && form.password === form.confirmPassword
+  // Input réutilisable avec styles cohérents
+  const inputClass = "w-full pl-12 pr-4 py-3 rounded-xl border-2 transition-all outline-none text-sm"
+  const inputStyle = { borderColor: '#E8DDD0', backgroundColor: '#FDFBF8', color: '#5D3A1A' }
+  const onFocus = (e: React.FocusEvent<HTMLInputElement>) => { e.target.style.borderColor = '#8B4513' }
+  const onBlur  = (e: React.FocusEvent<HTMLInputElement>) => { e.target.style.borderColor = '#E8DDD0' }
 
   return (
     <div className="w-full max-w-md">
-      {/* Logo */}
-      <div className="text-center mb-8">
-        <div className="inline-flex items-center gap-3 mb-2">
-          <span className="text-4xl">🏠</span>
-          <span
-            className="text-3xl font-bold"
-            style={{
-              backgroundImage: 'linear-gradient(135deg, #0066FF, #00D4AA)',
-              WebkitBackgroundClip: 'text',
-              WebkitTextFillColor: 'transparent',
-              backgroundClip: 'text',
-            }}
-          >
-            ImmoGest
-          </span>
-        </div>
-        <p className="text-gray-400 text-sm mt-1">
-          Gestion immobilière simplifiée
-        </p>
+
+      {/* Logo mobile uniquement */}
+      <div className="lg:hidden text-center mb-6">
+        <Link href="/">
+          <Image
+            src="/logo.png"
+            alt="KeurGest"
+            width={180}
+            height={50}
+            className="h-14 w-auto mx-auto"
+            priority
+          />
+        </Link>
       </div>
 
-      {/* Card */}
-      <div
-        className="rounded-2xl p-8 border border-white/10 shadow-2xl"
-        style={{
-          background: 'rgba(17, 24, 39, 0.8)',
-          backdropFilter: 'blur(20px)',
-          WebkitBackdropFilter: 'blur(20px)',
-          boxShadow: '0 25px 50px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255,255,255,0.05)',
-        }}
-      >
-        {/* Success state */}
-        {success ? (
-          <div className="py-6 text-center">
-            <div className="flex justify-center mb-4">
-              <CheckCircle size={56} style={{ color: '#00D4AA' }} />
+      {/* Card formulaire */}
+      <div className="bg-white rounded-2xl shadow-xl p-8 border" style={{ borderColor: '#F0E6D8' }}>
+
+        {/* Header */}
+        <div className="text-center mb-5">
+          <h1 className="text-2xl font-bold mb-2" style={{ color: '#5D3A1A' }}>
+            Créez votre compte
+          </h1>
+          <p style={{ color: '#8B7355' }}>Commencez gratuitement en quelques minutes</p>
+        </div>
+
+        {/* Badge gratuit */}
+        <div
+          className="flex items-center justify-center gap-2 py-2 px-4 rounded-full mb-6 mx-auto w-fit text-sm font-medium"
+          style={{ backgroundColor: '#F0F5E8', color: '#556B2F' }}
+        >
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+          </svg>
+          Essai gratuit • Aucune carte requise
+        </div>
+
+        {/* Formulaire */}
+        <form onSubmit={handleRegister} className="space-y-4">
+
+          {/* Nom */}
+          <div>
+            <label className="block text-sm font-medium mb-1.5" style={{ color: '#5D3A1A' }}>
+              Nom complet *
+            </label>
+            <div className="relative">
+              <User className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5" style={{ color: '#8B7355' }} />
+              <input
+                type="text"
+                name="nom"
+                value={formData.nom}
+                onChange={handleChange}
+                placeholder="Votre nom complet"
+                required
+                className={inputClass}
+                style={inputStyle}
+                onFocus={onFocus}
+                onBlur={onBlur}
+              />
             </div>
-            <h2 className="text-xl font-bold text-white mb-2">
-              Compte créé avec succès !
-            </h2>
-            <p className="text-gray-400 text-sm">
-              Redirection vers votre tableau de bord...
-            </p>
           </div>
-        ) : (
-          <>
-            <div className="mb-6">
-              <h1 className="text-2xl font-bold text-white">Créer un compte</h1>
-              <p className="text-gray-400 text-sm mt-1">
-                Rejoignez ImmoGest et gérez vos biens facilement.
-              </p>
+
+          {/* Email */}
+          <div>
+            <label className="block text-sm font-medium mb-1.5" style={{ color: '#5D3A1A' }}>
+              Adresse email *
+            </label>
+            <div className="relative">
+              <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5" style={{ color: '#8B7355' }} />
+              <input
+                type="email"
+                name="email"
+                value={formData.email}
+                onChange={handleChange}
+                placeholder="vous@exemple.com"
+                required
+                className={inputClass}
+                style={inputStyle}
+                onFocus={onFocus}
+                onBlur={onBlur}
+              />
             </div>
+          </div>
 
-            {/* Error message */}
-            {error && (
-              <div
-                className="mb-5 px-4 py-3 rounded-lg flex items-start gap-2 text-sm"
-                style={{
-                  background: 'rgba(239, 68, 68, 0.1)',
-                  border: '1px solid rgba(239, 68, 68, 0.3)',
-                  color: '#FCA5A5',
-                }}
-              >
-                <span className="mt-0.5">⚠️</span>
-                <span>{error}</span>
-              </div>
-            )}
-
-            <form onSubmit={handleRegister} className="space-y-4">
-              {/* Nom complet */}
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-1.5">
-                  Nom complet
-                </label>
-                <input
-                  type="text"
-                  name="nom"
-                  value={form.nom}
-                  onChange={handleChange}
-                  placeholder="Mamadou Diallo"
-                  required
-                  autoComplete="name"
-                  className="w-full px-4 py-3 rounded-xl text-white placeholder-gray-500 text-sm outline-none transition-all duration-200"
-                  style={inputBaseStyle}
-                  {...inputFocusHandlers}
-                />
-              </div>
-
-              {/* Email */}
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-1.5">
-                  Adresse email
-                </label>
-                <input
-                  type="email"
-                  name="email"
-                  value={form.email}
-                  onChange={handleChange}
-                  placeholder="vous@exemple.com"
-                  required
-                  autoComplete="email"
-                  className="w-full px-4 py-3 rounded-xl text-white placeholder-gray-500 text-sm outline-none transition-all duration-200"
-                  style={inputBaseStyle}
-                  {...inputFocusHandlers}
-                />
-              </div>
-
-              {/* Téléphone */}
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-1.5">
-                  Téléphone
-                </label>
+          {/* Téléphone + Entreprise côte à côte */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-sm font-medium mb-1.5" style={{ color: '#5D3A1A' }}>
+                Téléphone
+              </label>
+              <div className="relative">
+                <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: '#8B7355' }} />
                 <input
                   type="tel"
                   name="telephone"
-                  value={form.telephone}
+                  value={formData.telephone}
                   onChange={handleChange}
                   placeholder="77 123 45 67"
-                  autoComplete="tel"
-                  className="w-full px-4 py-3 rounded-xl text-white placeholder-gray-500 text-sm outline-none transition-all duration-200"
-                  style={inputBaseStyle}
-                  {...inputFocusHandlers}
+                  className="w-full pl-10 pr-3 py-3 rounded-xl border-2 transition-all outline-none text-sm"
+                  style={inputStyle}
+                  onFocus={onFocus}
+                  onBlur={onBlur}
                 />
               </div>
-
-              {/* Mot de passe */}
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-1.5">
-                  Mot de passe
-                </label>
-                <div className="relative">
-                  <input
-                    type={showPassword ? 'text' : 'password'}
-                    name="password"
-                    value={form.password}
-                    onChange={handleChange}
-                    placeholder="Min. 6 caractères"
-                    required
-                    autoComplete="new-password"
-                    className="w-full px-4 py-3 pr-12 rounded-xl text-white placeholder-gray-500 text-sm outline-none transition-all duration-200"
-                    style={inputBaseStyle}
-                    {...inputFocusHandlers}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-300 transition-colors p-1"
-                  >
-                    {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-                  </button>
-                </div>
-              </div>
-
-              {/* Confirmer mot de passe */}
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-1.5">
-                  Confirmer le mot de passe
-                </label>
-                <div className="relative">
-                  <input
-                    type={showConfirmPassword ? 'text' : 'password'}
-                    name="confirmPassword"
-                    value={form.confirmPassword}
-                    onChange={handleChange}
-                    placeholder="••••••••"
-                    required
-                    autoComplete="new-password"
-                    className="w-full px-4 py-3 pr-12 rounded-xl text-white placeholder-gray-500 text-sm outline-none transition-all duration-200"
-                    style={{
-                      ...inputBaseStyle,
-                      ...(form.confirmPassword.length > 0
-                        ? {
-                            border: passwordMatch
-                              ? '1px solid rgba(0, 212, 170, 0.5)'
-                              : '1px solid rgba(239, 68, 68, 0.4)',
-                          }
-                        : {}),
-                    }}
-                    onFocus={(e) => {
-                      e.currentTarget.style.border = '1px solid rgba(0, 102, 255, 0.6)'
-                      e.currentTarget.style.background = 'rgba(0, 102, 255, 0.05)'
-                      e.currentTarget.style.boxShadow = '0 0 0 3px rgba(0, 102, 255, 0.1)'
-                    }}
-                    onBlur={(e) => {
-                      if (form.confirmPassword.length > 0) {
-                        e.currentTarget.style.border = passwordMatch
-                          ? '1px solid rgba(0, 212, 170, 0.5)'
-                          : '1px solid rgba(239, 68, 68, 0.4)'
-                      } else {
-                        e.currentTarget.style.border = '1px solid rgba(255, 255, 255, 0.1)'
-                      }
-                      e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)'
-                      e.currentTarget.style.boxShadow = 'none'
-                    }}
-                  />
-                  <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1">
-                    {form.confirmPassword.length > 0 && (
-                      <span
-                        className="text-xs mr-1"
-                        style={{ color: passwordMatch ? '#00D4AA' : '#F87171' }}
-                      >
-                        {passwordMatch ? '✓' : '✗'}
-                      </span>
-                    )}
-                    <button
-                      type="button"
-                      onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                      className="text-gray-500 hover:text-gray-300 transition-colors p-1"
-                    >
-                      {showConfirmPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              {/* Submit */}
-              <button
-                type="submit"
-                disabled={loading}
-                className="w-full py-3 px-4 rounded-xl font-semibold text-white text-sm flex items-center justify-center gap-2 transition-all duration-200 mt-2 disabled:opacity-60 disabled:cursor-not-allowed"
-                style={{
-                  background: loading
-                    ? 'rgba(0, 102, 255, 0.5)'
-                    : 'linear-gradient(135deg, #0066FF 0%, #00D4AA 100%)',
-                  boxShadow: loading ? 'none' : '0 4px 20px rgba(0, 102, 255, 0.35)',
-                }}
-                onMouseEnter={(e) => {
-                  if (!loading) {
-                    e.currentTarget.style.transform = 'translateY(-1px)'
-                    e.currentTarget.style.boxShadow = '0 6px 25px rgba(0, 102, 255, 0.5)'
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.transform = 'translateY(0)'
-                  e.currentTarget.style.boxShadow = '0 4px 20px rgba(0, 102, 255, 0.35)'
-                }}
-              >
-                {loading ? (
-                  <>
-                    <Loader2 size={16} className="animate-spin" />
-                    Création du compte...
-                  </>
-                ) : (
-                  <>
-                    <UserPlus size={16} />
-                    Créer mon compte
-                  </>
-                )}
-              </button>
-            </form>
-
-            {/* Divider */}
-            <div className="flex items-center gap-3 my-6">
-              <div className="flex-1 h-px" style={{ background: 'rgba(255,255,255,0.08)' }} />
-              <span className="text-xs text-gray-600">ou</span>
-              <div className="flex-1 h-px" style={{ background: 'rgba(255,255,255,0.08)' }} />
             </div>
+            <div>
+              <label className="block text-sm font-medium mb-1.5" style={{ color: '#5D3A1A' }}>
+                Entreprise
+              </label>
+              <div className="relative">
+                <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: '#8B7355' }} />
+                <input
+                  type="text"
+                  name="entreprise"
+                  value={formData.entreprise}
+                  onChange={handleChange}
+                  placeholder="Optionnel"
+                  className="w-full pl-10 pr-3 py-3 rounded-xl border-2 transition-all outline-none text-sm"
+                  style={inputStyle}
+                  onFocus={onFocus}
+                  onBlur={onBlur}
+                />
+              </div>
+            </div>
+          </div>
 
-            {/* Login link */}
-            <p className="text-center text-sm text-gray-400">
-              Déjà un compte ?{' '}
-              <Link
-                href="/login"
-                className="font-semibold transition-colors"
-                style={{ color: '#00D4AA' }}
-                onMouseEnter={(e) => (e.currentTarget.style.color = '#0066FF')}
-                onMouseLeave={(e) => (e.currentTarget.style.color = '#00D4AA')}
+          {/* Mot de passe */}
+          <div>
+            <label className="block text-sm font-medium mb-1.5" style={{ color: '#5D3A1A' }}>
+              Mot de passe *
+            </label>
+            <div className="relative">
+              <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5" style={{ color: '#8B7355' }} />
+              <input
+                type={showPassword ? 'text' : 'password'}
+                name="password"
+                value={formData.password}
+                onChange={handleChange}
+                placeholder="Minimum 6 caractères"
+                required
+                className="w-full pl-12 pr-12 py-3 rounded-xl border-2 transition-all outline-none text-sm"
+                style={inputStyle}
+                onFocus={onFocus}
+                onBlur={onBlur}
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-4 top-1/2 -translate-y-1/2"
+                style={{ color: '#8B7355' }}
               >
-                Se connecter
-              </Link>
-            </p>
-          </>
-        )}
+                {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+              </button>
+            </div>
+          </div>
+
+          {/* Confirmer mot de passe */}
+          <div>
+            <label className="block text-sm font-medium mb-1.5" style={{ color: '#5D3A1A' }}>
+              Confirmer le mot de passe *
+            </label>
+            <div className="relative">
+              <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5" style={{ color: '#8B7355' }} />
+              <input
+                type={showPassword ? 'text' : 'password'}
+                name="confirmPassword"
+                value={formData.confirmPassword}
+                onChange={handleChange}
+                placeholder="Confirmez votre mot de passe"
+                required
+                className={inputClass}
+                style={inputStyle}
+                onFocus={onFocus}
+                onBlur={onBlur}
+              />
+            </div>
+          </div>
+
+          {/* Conditions d'utilisation */}
+          <label className="flex items-start gap-3 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={acceptTerms}
+              onChange={(e) => setAcceptTerms(e.target.checked)}
+              className="w-4 h-4 mt-0.5 rounded flex-shrink-0"
+              style={{ accentColor: '#8B4513' }}
+            />
+            <span className="text-sm leading-relaxed" style={{ color: '#8B7355' }}>
+              J&apos;accepte les{' '}
+              <a href="#" className="font-medium underline" style={{ color: '#8B4513' }}>
+                conditions d&apos;utilisation
+              </a>
+              {' '}et la{' '}
+              <a href="#" className="font-medium underline" style={{ color: '#8B4513' }}>
+                politique de confidentialité
+              </a>
+            </span>
+          </label>
+
+          {/* Erreur */}
+          {error && (
+            <div
+              className="p-4 rounded-xl text-sm flex items-center gap-3"
+              style={{ backgroundColor: '#FEF2F2', color: '#DC2626' }}
+            >
+              <svg className="w-5 h-5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                  d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              {error}
+            </div>
+          )}
+
+          {/* Bouton submit */}
+          <button
+            type="submit"
+            disabled={loading}
+            className="w-full py-4 rounded-xl font-semibold text-white flex items-center justify-center gap-2 transition-all hover:opacity-90 disabled:opacity-50"
+            style={{ backgroundColor: '#8B4513', boxShadow: '0 4px 15px rgba(139,69,19,0.3)' }}
+          >
+            {loading ? (
+              <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+            ) : (
+              <>Créer mon compte gratuit <ArrowRight className="w-5 h-5" /></>
+            )}
+          </button>
+        </form>
+
+        {/* Lien connexion */}
+        <p className="text-center mt-6" style={{ color: '#8B7355' }}>
+          Déjà un compte ?{' '}
+          <Link href="/login" className="font-semibold hover:underline" style={{ color: '#8B4513' }}>
+            Se connecter
+          </Link>
+        </p>
       </div>
 
       {/* Footer */}
-      <p className="text-center text-xs text-gray-600 mt-6">
-        © 2025 ImmoGest · Tous droits réservés
+      <p className="text-center mt-6 text-sm" style={{ color: '#8B7355' }}>
+        © 2026 KeurGest — Dakar, Sénégal 🇸🇳
       </p>
     </div>
   )

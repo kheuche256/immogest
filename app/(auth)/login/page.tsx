@@ -1,230 +1,190 @@
 'use client'
 
 import { useState } from 'react'
-import Link from 'next/link'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
+import Image from 'next/image'
 import { createClient } from '@/lib/supabase/client'
-import { Eye, EyeOff, LogIn, Loader2 } from 'lucide-react'
+import { Mail, Lock, ArrowRight, Eye, EyeOff, Phone } from 'lucide-react'
 
 export default function LoginPage() {
-  const router = useRouter()
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
+  const [email, setEmail]               = useState('')
+  const [password, setPassword]         = useState('')
   const [showPassword, setShowPassword] = useState(false)
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState('')
+  const [error, setError]               = useState('')
+  const [loading, setLoading]           = useState(false)
+  const router   = useRouter()
+  const supabase = createClient()
 
-  async function handleLogin(e: React.FormEvent) {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
     setLoading(true)
-
-    const supabase = createClient()
-    const { error: authError } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    })
-
-    if (authError) {
-      setError(
-        authError.message === 'Invalid login credentials'
-          ? 'Email ou mot de passe incorrect.'
-          : authError.message
-      )
+    try {
+      const { error } = await supabase.auth.signInWithPassword({ email, password })
+      if (error) throw error
+      router.push('/dashboard')
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Email ou mot de passe incorrect')
+    } finally {
       setLoading(false)
-      return
     }
-
-    router.push('/dashboard')
-    router.refresh()
   }
 
   return (
     <div className="w-full max-w-md">
-      {/* Logo */}
-      <div className="text-center mb-8">
-        <div className="inline-flex items-center gap-3 mb-2">
-          <span className="text-4xl">🏠</span>
-          <span
-            className="text-3xl font-bold"
-            style={{
-              backgroundImage: 'linear-gradient(135deg, #0066FF, #00D4AA)',
-              WebkitBackgroundClip: 'text',
-              WebkitTextFillColor: 'transparent',
-              backgroundClip: 'text',
-            }}
-          >
-            ImmoGest
-          </span>
-        </div>
-        <p className="text-gray-400 text-sm mt-1">
-          Gestion immobilière simplifiée
-        </p>
+
+      {/* Logo mobile uniquement */}
+      <div className="lg:hidden text-center mb-8">
+        <Link href="/">
+          <Image
+            src="/logo.png"
+            alt="KeurGest"
+            width={180}
+            height={50}
+            className="h-14 w-auto mx-auto"
+            priority
+          />
+        </Link>
       </div>
 
-      {/* Card */}
-      <div
-        className="rounded-2xl p-8 border border-white/10 shadow-2xl"
-        style={{
-          background: 'rgba(17, 24, 39, 0.8)',
-          backdropFilter: 'blur(20px)',
-          WebkitBackdropFilter: 'blur(20px)',
-          boxShadow: '0 25px 50px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255,255,255,0.05)',
-        }}
-      >
-        <div className="mb-6">
-          <h1 className="text-2xl font-bold text-white">Connexion</h1>
-          <p className="text-gray-400 text-sm mt-1">
-            Bienvenue ! Connectez-vous à votre compte.
-          </p>
+      {/* Card formulaire */}
+      <div className="bg-white rounded-2xl shadow-xl p-8 border" style={{ borderColor: '#F0E6D8' }}>
+
+        {/* Header */}
+        <div className="text-center mb-8">
+          <h1 className="text-2xl font-bold mb-2" style={{ color: '#5D3A1A' }}>
+            Bon retour !
+          </h1>
+          <p style={{ color: '#8B7355' }}>Connectez-vous à votre espace KeurGest</p>
         </div>
 
-        {/* Error message */}
-        {error && (
-          <div
-            className="mb-5 px-4 py-3 rounded-lg flex items-start gap-2 text-sm"
-            style={{
-              background: 'rgba(239, 68, 68, 0.1)',
-              border: '1px solid rgba(239, 68, 68, 0.3)',
-              color: '#FCA5A5',
-            }}
-          >
-            <span className="mt-0.5">⚠️</span>
-            <span>{error}</span>
-          </div>
-        )}
-
+        {/* Formulaire */}
         <form onSubmit={handleLogin} className="space-y-5">
+
           {/* Email */}
           <div>
-            <label className="block text-sm font-medium text-gray-300 mb-1.5">
+            <label className="block text-sm font-medium mb-2" style={{ color: '#5D3A1A' }}>
               Adresse email
             </label>
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="vous@exemple.com"
-              required
-              autoComplete="email"
-              className="w-full px-4 py-3 rounded-xl text-white placeholder-gray-500 text-sm outline-none transition-all duration-200"
-              style={{
-                background: 'rgba(255, 255, 255, 0.05)',
-                border: '1px solid rgba(255, 255, 255, 0.1)',
-              }}
-              onFocus={(e) => {
-                e.currentTarget.style.border = '1px solid rgba(0, 102, 255, 0.6)'
-                e.currentTarget.style.background = 'rgba(0, 102, 255, 0.05)'
-                e.currentTarget.style.boxShadow = '0 0 0 3px rgba(0, 102, 255, 0.1)'
-              }}
-              onBlur={(e) => {
-                e.currentTarget.style.border = '1px solid rgba(255, 255, 255, 0.1)'
-                e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)'
-                e.currentTarget.style.boxShadow = 'none'
-              }}
-            />
+            <div className="relative">
+              <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5" style={{ color: '#8B7355' }} />
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="vous@exemple.com"
+                required
+                className="w-full pl-12 pr-4 py-3.5 rounded-xl border-2 transition-all outline-none text-base"
+                style={{ borderColor: '#E8DDD0', backgroundColor: '#FDFBF8', color: '#5D3A1A' }}
+                onFocus={(e) => { e.target.style.borderColor = '#8B4513' }}
+                onBlur={(e)  => { e.target.style.borderColor = '#E8DDD0' }}
+              />
+            </div>
           </div>
 
-          {/* Password */}
+          {/* Mot de passe */}
           <div>
-            <label className="block text-sm font-medium text-gray-300 mb-1.5">
+            <label className="block text-sm font-medium mb-2" style={{ color: '#5D3A1A' }}>
               Mot de passe
             </label>
             <div className="relative">
+              <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5" style={{ color: '#8B7355' }} />
               <input
                 type={showPassword ? 'text' : 'password'}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••"
                 required
-                autoComplete="current-password"
-                className="w-full px-4 py-3 pr-12 rounded-xl text-white placeholder-gray-500 text-sm outline-none transition-all duration-200"
-                style={{
-                  background: 'rgba(255, 255, 255, 0.05)',
-                  border: '1px solid rgba(255, 255, 255, 0.1)',
-                }}
-                onFocus={(e) => {
-                  e.currentTarget.style.border = '1px solid rgba(0, 102, 255, 0.6)'
-                  e.currentTarget.style.background = 'rgba(0, 102, 255, 0.05)'
-                  e.currentTarget.style.boxShadow = '0 0 0 3px rgba(0, 102, 255, 0.1)'
-                }}
-                onBlur={(e) => {
-                  e.currentTarget.style.border = '1px solid rgba(255, 255, 255, 0.1)'
-                  e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)'
-                  e.currentTarget.style.boxShadow = 'none'
-                }}
+                className="w-full pl-12 pr-12 py-3.5 rounded-xl border-2 transition-all outline-none text-base"
+                style={{ borderColor: '#E8DDD0', backgroundColor: '#FDFBF8', color: '#5D3A1A' }}
+                onFocus={(e) => { e.target.style.borderColor = '#8B4513' }}
+                onBlur={(e)  => { e.target.style.borderColor = '#E8DDD0' }}
               />
               <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-300 transition-colors p-1"
+                className="absolute right-4 top-1/2 -translate-y-1/2 p-1"
+                style={{ color: '#8B7355' }}
               >
-                {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
               </button>
             </div>
           </div>
 
-          {/* Submit */}
+          {/* Options */}
+          <div className="flex items-center justify-between">
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                className="w-4 h-4 rounded"
+                style={{ accentColor: '#8B4513' }}
+              />
+              <span className="text-sm" style={{ color: '#8B7355' }}>Se souvenir de moi</span>
+            </label>
+            <a href="#" className="text-sm font-medium hover:underline" style={{ color: '#8B4513' }}>
+              Mot de passe oublié ?
+            </a>
+          </div>
+
+          {/* Erreur */}
+          {error && (
+            <div
+              className="p-4 rounded-xl text-sm flex items-center gap-3"
+              style={{ backgroundColor: '#FEF2F2', color: '#DC2626' }}
+            >
+              <svg className="w-5 h-5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                  d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              {error}
+            </div>
+          )}
+
+          {/* Bouton submit */}
           <button
             type="submit"
             disabled={loading}
-            className="w-full py-3 px-4 rounded-xl font-semibold text-white text-sm flex items-center justify-center gap-2 transition-all duration-200 mt-2 disabled:opacity-60 disabled:cursor-not-allowed"
-            style={{
-              background: loading
-                ? 'rgba(0, 102, 255, 0.5)'
-                : 'linear-gradient(135deg, #0066FF 0%, #00D4AA 100%)',
-              boxShadow: loading ? 'none' : '0 4px 20px rgba(0, 102, 255, 0.35)',
-            }}
-            onMouseEnter={(e) => {
-              if (!loading) {
-                e.currentTarget.style.transform = 'translateY(-1px)'
-                e.currentTarget.style.boxShadow = '0 6px 25px rgba(0, 102, 255, 0.5)'
-              }
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.transform = 'translateY(0)'
-              e.currentTarget.style.boxShadow = '0 4px 20px rgba(0, 102, 255, 0.35)'
-            }}
+            className="w-full py-4 rounded-xl font-semibold text-white flex items-center justify-center gap-2 transition-all hover:opacity-90 disabled:opacity-50 text-base"
+            style={{ backgroundColor: '#8B4513', boxShadow: '0 4px 15px rgba(139,69,19,0.3)' }}
           >
             {loading ? (
-              <>
-                <Loader2 size={16} className="animate-spin" />
-                Connexion en cours...
-              </>
+              <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
             ) : (
-              <>
-                <LogIn size={16} />
-                Se connecter
-              </>
+              <>Se connecter <ArrowRight className="w-5 h-5" /></>
             )}
           </button>
         </form>
 
-        {/* Divider */}
-        <div className="flex items-center gap-3 my-6">
-          <div className="flex-1 h-px" style={{ background: 'rgba(255,255,255,0.08)' }} />
-          <span className="text-xs text-gray-600">ou</span>
-          <div className="flex-1 h-px" style={{ background: 'rgba(255,255,255,0.08)' }} />
+        {/* Séparateur */}
+        <div className="flex items-center gap-4 my-6">
+          <div className="flex-1 h-px" style={{ backgroundColor: '#E8DDD0' }} />
+          <span className="text-sm" style={{ color: '#8B7355' }}>ou</span>
+          <div className="flex-1 h-px" style={{ backgroundColor: '#E8DDD0' }} />
         </div>
 
-        {/* Register link */}
-        <p className="text-center text-sm text-gray-400">
+        {/* Bouton contact */}
+        <a
+          href="tel:+221771234567"
+          className="w-full py-3 rounded-xl font-medium flex items-center justify-center gap-2 border-2 transition-all hover:bg-amber-50"
+          style={{ borderColor: '#E8DDD0', color: '#5D3A1A' }}
+        >
+          <Phone className="w-5 h-5" />
+          Besoin d&apos;aide ? Appelez-nous
+        </a>
+
+        {/* Lien inscription */}
+        <p className="text-center mt-6" style={{ color: '#8B7355' }}>
           Pas encore de compte ?{' '}
-          <Link
-            href="/register"
-            className="font-semibold transition-colors"
-            style={{ color: '#00D4AA' }}
-            onMouseEnter={(e) => (e.currentTarget.style.color = '#0066FF')}
-            onMouseLeave={(e) => (e.currentTarget.style.color = '#00D4AA')}
-          >
-            S&apos;inscrire
+          <Link href="/register" className="font-semibold hover:underline" style={{ color: '#8B4513' }}>
+            Créer un compte gratuit
           </Link>
         </p>
       </div>
 
       {/* Footer */}
-      <p className="text-center text-xs text-gray-600 mt-6">
-        © 2025 ImmoGest · Tous droits réservés
+      <p className="text-center mt-6 text-sm" style={{ color: '#8B7355' }}>
+        © 2026 KeurGest — Dakar, Sénégal 🇸🇳
       </p>
     </div>
   )

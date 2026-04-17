@@ -136,16 +136,23 @@ export default function BienForm({
   const isEdit = !!initialData
 
   const [form, setForm] = useState<BienFormData>({
-    nom:            initialData?.nom            ?? '',
-    type:           initialData?.type           ?? 'appartement',
-    adresse:        initialData?.adresse        ?? '',
-    quartier:       initialData?.quartier       ?? '',
-    ville:          initialData?.ville          ?? 'Dakar',
-    nb_unites:      initialData?.nb_unites      ?? 1,
-    loyer_mensuel:  initialData?.loyer_mensuel  ?? 0,
-    charges:        initialData?.charges        ?? 0,
-    description:    initialData?.description    ?? '',
-    statut:         initialData?.statut         ?? 'disponible',
+    nom:                 initialData?.nom                 ?? '',
+    type:                initialData?.type                ?? 'appartement',
+    adresse:             initialData?.adresse             ?? '',
+    quartier:            initialData?.quartier            ?? '',
+    ville:               initialData?.ville               ?? 'Dakar',
+    nb_unites:           initialData?.nb_unites           ?? 1,
+    loyer_mensuel:       initialData?.loyer_mensuel       ?? 0,
+    charges:             initialData?.charges             ?? 0,
+    description:         initialData?.description         ?? '',
+    statut:              initialData?.statut              ?? 'disponible',
+    // Location meublée
+    est_meuble:          initialData?.est_meuble          ?? false,
+    tarif_nuit:          initialData?.tarif_nuit          ?? null,
+    tarif_semaine:       initialData?.tarif_semaine       ?? null,
+    tarif_mois:          initialData?.tarif_mois          ?? null,
+    capacite_personnes:  initialData?.capacite_personnes  ?? 1,
+    equipements:         initialData?.equipements         ?? [],
   })
 
   const [errors, setErrors] = useState<FormErrors>({})
@@ -426,6 +433,177 @@ export default function BienForm({
             />
           </Field>
         </div>
+      </div>
+
+      {/* ── Section 5 : Location Meublée ─────────────────────────────────── */}
+      <div style={sectionStyle}>
+        <h2 className="text-sm font-bold text-white mb-5 flex items-center gap-2">
+          <span className="w-6 h-6 rounded-md flex items-center justify-center text-xs" style={{ background: 'rgba(218,165,32,0.2)', color: '#DAA520' }}>5</span>
+          Location Meublée
+        </h2>
+
+        {/* Toggle Meublé */}
+        <div
+          className="flex items-center justify-between p-4 rounded-xl mb-4 cursor-pointer"
+          style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}
+          onClick={() => set('est_meuble', !form.est_meuble)}
+        >
+          <div>
+            <p className="text-sm font-semibold text-white">Ce bien est meublé</p>
+            <p className="text-xs mt-0.5" style={{ color: '#6B7280' }}>
+              Activez pour configurer les tarifs courte durée
+            </p>
+          </div>
+          <div
+            className="relative w-12 h-6 rounded-full transition-all duration-300 flex-shrink-0"
+            style={{ background: form.est_meuble ? '#DAA520' : 'rgba(255,255,255,0.15)' }}
+          >
+            <div
+              className="absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-all duration-300"
+              style={{ left: form.est_meuble ? '26px' : '2px' }}
+            />
+          </div>
+        </div>
+
+        {/* Champs conditionnels */}
+        {form.est_meuble && (
+          <div className="space-y-5 pt-2">
+
+            {/* Tarifs */}
+            <div>
+              <Label>Tarifs (FCFA)</Label>
+              <div className="grid grid-cols-3 gap-3 mt-2">
+                {[
+                  { key: 'tarif_nuit'    as const, label: 'Par nuit',    placeholder: '35 000' },
+                  { key: 'tarif_semaine' as const, label: 'Par semaine', placeholder: '200 000' },
+                  { key: 'tarif_mois'    as const, label: 'Par mois',    placeholder: '600 000' },
+                ].map(({ key, label, placeholder }) => (
+                  <div key={key}>
+                    <p className="text-xs mb-1.5" style={{ color: '#6B7280' }}>{label}</p>
+                    <input
+                      type="number"
+                      min={0}
+                      value={form[key] ?? ''}
+                      onChange={(e) => set(key, parseInt(e.target.value) || null)}
+                      onFocus={onFocusStyle}
+                      onBlur={(e) => onBlurStyle(e)}
+                      placeholder={placeholder}
+                      style={{ ...inputClass(), paddingRight: 14 }}
+                    />
+                  </div>
+                ))}
+              </div>
+
+              {/* Récap tarifs remplis */}
+              {(form.tarif_nuit || form.tarif_semaine || form.tarif_mois) && (
+                <div
+                  className="mt-3 flex flex-wrap gap-2"
+                >
+                  {form.tarif_nuit && (
+                    <span className="text-xs px-2.5 py-1 rounded-lg font-medium"
+                      style={{ background: 'rgba(218,165,32,0.15)', color: '#DAA520' }}>
+                      🌙 {new Intl.NumberFormat('fr-FR').format(form.tarif_nuit)} F/nuit
+                    </span>
+                  )}
+                  {form.tarif_semaine && (
+                    <span className="text-xs px-2.5 py-1 rounded-lg font-medium"
+                      style={{ background: 'rgba(218,165,32,0.15)', color: '#DAA520' }}>
+                      📅 {new Intl.NumberFormat('fr-FR').format(form.tarif_semaine)} F/semaine
+                    </span>
+                  )}
+                  {form.tarif_mois && (
+                    <span className="text-xs px-2.5 py-1 rounded-lg font-medium"
+                      style={{ background: 'rgba(218,165,32,0.15)', color: '#DAA520' }}>
+                      📆 {new Intl.NumberFormat('fr-FR').format(form.tarif_mois)} F/mois
+                    </span>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Capacité */}
+            <div>
+              <Label>Capacité d'accueil</Label>
+              <div className="flex items-center gap-3 mt-2">
+                <button
+                  type="button"
+                  onClick={() => set('capacite_personnes', Math.max(1, (form.capacite_personnes ?? 1) - 1))}
+                  className="w-10 h-10 rounded-xl flex items-center justify-center font-bold text-lg transition-all"
+                  style={{ background: 'rgba(255,255,255,0.08)', color: '#9CA3AF' }}
+                >
+                  −
+                </button>
+                <div
+                  className="w-16 h-10 rounded-xl flex items-center justify-center font-bold text-white text-base"
+                  style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)' }}
+                >
+                  {form.capacite_personnes ?? 1}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => set('capacite_personnes', Math.min(20, (form.capacite_personnes ?? 1) + 1))}
+                  className="w-10 h-10 rounded-xl flex items-center justify-center font-bold text-lg transition-all"
+                  style={{ background: 'rgba(255,255,255,0.08)', color: '#9CA3AF' }}
+                >
+                  +
+                </button>
+                <span className="text-sm" style={{ color: '#6B7280' }}>
+                  personne{(form.capacite_personnes ?? 1) > 1 ? 's' : ''} maximum
+                </span>
+              </div>
+            </div>
+
+            {/* Équipements */}
+            <div>
+              <Label>Équipements inclus</Label>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mt-2">
+                {[
+                  { id: 'wifi',               label: 'WiFi',               icon: '📶' },
+                  { id: 'climatisation',       label: 'Climatisation',      icon: '❄️' },
+                  { id: 'parking',             label: 'Parking',            icon: '🅿️' },
+                  { id: 'cuisine',             label: 'Cuisine équipée',    icon: '🍳' },
+                  { id: 'lave_linge',          label: 'Lave-linge',         icon: '🧺' },
+                  { id: 'tv',                  label: 'Télévision',         icon: '📺' },
+                  { id: 'piscine',             label: 'Piscine',            icon: '🏊' },
+                  { id: 'gardien',             label: 'Gardien',            icon: '👮' },
+                  { id: 'groupe_electrogene',  label: 'Groupe électrogène', icon: '⚡' },
+                ].map((eq) => {
+                  const selected = (form.equipements ?? []).includes(eq.id)
+                  return (
+                    <button
+                      key={eq.id}
+                      type="button"
+                      onClick={() => {
+                        const cur = form.equipements ?? []
+                        set('equipements', selected
+                          ? cur.filter(e => e !== eq.id)
+                          : [...cur, eq.id]
+                        )
+                      }}
+                      className="flex items-center gap-2 px-3 py-2.5 rounded-xl text-left text-sm transition-all"
+                      style={{
+                        background: selected ? 'rgba(218,165,32,0.12)' : 'rgba(255,255,255,0.04)',
+                        border: `1px solid ${selected ? '#DAA520' : 'rgba(255,255,255,0.08)'}`,
+                        color: selected ? '#DAA520' : '#9CA3AF',
+                      }}
+                    >
+                      <span className="text-base leading-none">{eq.icon}</span>
+                      <span className="font-medium leading-tight">{eq.label}</span>
+                      {selected && (
+                        <span className="ml-auto text-xs font-bold">✓</span>
+                      )}
+                    </button>
+                  )
+                })}
+              </div>
+              {(form.equipements ?? []).length > 0 && (
+                <p className="mt-2 text-xs" style={{ color: '#6B7280' }}>
+                  {(form.equipements ?? []).length} équipement{(form.equipements ?? []).length > 1 ? 's' : ''} sélectionné{(form.equipements ?? []).length > 1 ? 's' : ''}
+                </p>
+              )}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* ── Boutons ──────────────────────────────────────────────────────── */}
